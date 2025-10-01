@@ -6,6 +6,8 @@ library(tensorflow)
 set.seed(123)
 set_random_seed(123)
 
+library(compiler)
+enableJIT(3) # Level 3 is the highest
 
 # 1 - unimodal ----
 
@@ -30,7 +32,7 @@ discriminator <- function(dim = 1) {
 
 summary(discriminator())
 
-gan <- new_model_class(
+gan <- keras3::new_model_class(
   classname = "GAN",
   # initialize model with generator, discriminator, dimension
   # of the random latent vectors (i.e., the input that is 
