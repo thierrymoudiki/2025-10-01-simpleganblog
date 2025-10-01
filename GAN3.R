@@ -72,7 +72,11 @@ gan <- keras3::new_model_class(
 # Reusable training function
 train_gan <- function(train_dat, generator_fn, discriminator_fn, 
                       n_iter = 5, epochs_per_iter = 30, 
-                      num_resamples = 500) {
+                      num_resamples = 500, seed=123L) {
+  set.seed(seed)
+  set_random_seed(seed)
+  tf$random$set_seed(seed)
+  
   latent_dim <- as.integer(1)
   nsyn <- nrow(train_dat)
   # Build and compile model
@@ -142,6 +146,14 @@ print(paste0("Elapsed ", proc.time()[3] - start))
 plot(density(train_dat))
 lines(density(result1$resamples), col="red")
 
+all.equal(result1$resamples, train_gan(
+  train_dat = train_dat,
+  generator_fn = generator_unimodal,
+  discriminator_fn = discriminator_unimodal,
+  n_iter = 5,
+  epochs_per_iter = 30,
+  num_resamples = 500
+)$resamples)
 
 # ============================================================================
 # 2 - MIXTURE ----
@@ -191,9 +203,86 @@ result2 <- train_gan(
   discriminator_fn = discriminator_mixture,
   n_iter = 5,
   epochs_per_iter = 100,
-  num_resamples = 1000
+  num_resamples = 500
 )
 print(paste0("Elapsed ", proc.time()[3] - start))
 plot(density(train_dat))
 lines(density(result2$resamples), col="red")
 
+# ============================================================================
+# 3 - GARCH ----
+# ============================================================================
+
+# GARCH
+library(rugarch)
+
+## dmbp 
+data(dmbp)
+x <- as.matrix(dmbp[seq_len(500), 1])
+forecast::checkresiduals(drop(x))
+start <- proc.time()[3]
+result1 <- train_gan(
+  train_dat = x,
+  generator_fn = generator_unimodal,
+  discriminator_fn = discriminator_unimodal,
+  n_iter = 5,
+  epochs_per_iter = 30,
+  num_resamples = 500
+)
+print(paste0("Elapsed ", proc.time()[3] - start))
+# Train
+start <- proc.time()[3]
+result2 <- train_gan(
+  train_dat = x,
+  generator_fn = generator_mixture,
+  discriminator_fn = discriminator_mixture,
+  n_iter = 5,
+  epochs_per_iter = 100,
+  num_resamples = 500
+)
+print(paste0("Elapsed ", proc.time()[3] - start))
+ks.test(x, result1$resamples)
+ks.test(x, result2$resamples)
+par(mfrow=c(1, 2))
+plot(density(x))
+lines(density(result1$resamples), col="red")
+plot(density(x))
+lines(density(result2$resamples), col="red")
+
+
+## more examples
+
+for (i in seq_len(4))
+{
+  cat("iteration i: ", i, "=====================")
+  x <- as.matrix(diff(log(EuStockMarkets[seq_len(500), i])))
+  forecast::checkresiduals(drop(x))
+  start <- proc.time()[3]
+  result1 <- train_gan(
+    train_dat = x,
+    generator_fn = generator_unimodal,
+    discriminator_fn = discriminator_unimodal,
+    n_iter = 5,
+    epochs_per_iter = 30,
+    num_resamples = 500
+  )
+  print(paste0("Elapsed ", proc.time()[3] - start))
+  # Train
+  start <- proc.time()[3]
+  result2 <- train_gan(
+    train_dat = x,
+    generator_fn = generator_mixture,
+    discriminator_fn = discriminator_mixture,
+    n_iter = 5,
+    epochs_per_iter = 100,
+    num_resamples = 500
+  )
+  print(paste0("Elapsed ", proc.time()[3] - start))
+  print(ks.test(x, result1$resamples))
+  print(ks.test(x, result2$resamples))
+  par(mfrow=c(1, 2))
+  plot(density(x))
+  lines(density(result1$resamples), col="red")
+  plot(density(x))
+  lines(density(result2$resamples), col="red")
+}
